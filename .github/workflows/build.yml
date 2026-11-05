@@ -1,10 +1,9 @@
-name: Build Multiplatform Binaries
+name: Build and Release Multiplatform Binaries
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - 'v*' # Dispara apenas quando você cria uma tag como v1.0.0, v0.1.0, etc.
 
 jobs:
   build:
@@ -41,16 +40,49 @@ jobs:
     - name: Build Binary
       run: cargo build --release --target ${{ matrix.target }}
 
-    - name: Rename Windows Binary
+    - name: Prepare Windows Artifact
       if: matrix.os == 'windows-latest'
       run: cp target/${{ matrix.target }}/release/folio.exe ./folio-windows.exe
 
-    - name: Rename Unix Binaries
+    - name: Prepare Unix Artifacts
       if: matrix.os != 'windows-latest'
       run: cp target/${{ matrix.target }}/release/folio ./${{ matrix.artifact_name }}
 
-    - name: Upload Artifacts
+    - name: Upload Artifact to Workflow
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
         path: ${{ matrix.artifact_name }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Permissão obrigatória para criar o Release
+    steps:
+    - name: Download Windows Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: folio-windows.exe
+
+    - name: Download Mac Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: folio-mac-intel
+
+    - name: Download Linux Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: folio-linux
+
+    - name: Publish Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          folio-windows.exe
+          folio-mac-intel
+          folio-linux
+        body: "Release automática gerada pelo GitHub Actions."
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
