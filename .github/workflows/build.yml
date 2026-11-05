@@ -1,0 +1,56 @@
+name: Build Multiplatform Binaries
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: folio-windows.exe
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: folio-mac-intel
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: folio-linux
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Linux Dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev libgtk-3-dev libsoup2.4-dev
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Build Binary
+      run: cargo build --release --target ${{ matrix.target }}
+
+    - name: Rename Windows Binary
+      if: matrix.os == 'windows-latest'
+      run: cp target/${{ matrix.target }}/release/folio.exe ./folio-windows.exe
+
+    - name: Rename Unix Binaries
+      if: matrix.os != 'windows-latest'
+      run: cp target/${{ matrix.target }}/release/folio ./${{ matrix.artifact_name }}
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: ${{ matrix.artifact_name }}
