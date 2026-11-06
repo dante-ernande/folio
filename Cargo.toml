@@ -1,15 +1,10 @@
-[package]
-name = "folio"
+[package.metadata.packager]
+product_name = "Folio"
+identifier = "com.danteernande.folio"
 version = "0.1.0"
-edition = "2021"
+authors = ["Ernande"]
+description = "Leitor de livros digitais Folio"
+formats = ["dmg", "appimage", "nsis"] 
 
-[dependencies]
-eframe = { version = "0.31", features = ["persistence"] }
-serde = { version = "1", features = ["derive"] }
-zip = { version = "2", default-features = false, features = ["deflate"] }
-roxmltree = "0.20"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
-rfd = "0.15"
-
-[profile.release]
-opt-level = 3
+[package.metadata.packager.macos]
+minimum_system_version = "10.12"
