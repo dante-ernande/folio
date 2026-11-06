@@ -20,7 +20,8 @@ identifier = "com.danteernande.folio"
 version = "0.1.0"
 authors = ["Ernande"]
 description = "Leitor de livros digitais Folio"
-formats = ["dmg", "appimage", "nsis"] 
+formats = ["dmg", "appimage", "nsis"]
+icons = ["icon.png"] 
 
 [package.metadata.packager.macos]
 minimum_system_version = "10.12"
