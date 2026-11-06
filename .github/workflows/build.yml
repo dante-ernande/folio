@@ -1,26 +1,23 @@
-name: Build and Release Multiplatform Binaries
+name: Build and Pack Release
 
 on:
   push:
     tags:
-      - 'v*' # Dispara apenas quando você cria uma tag como v1.0.0, v0.1.0, etc.
+      - 'v*'
 
 jobs:
-  build:
-    name: Build for ${{ matrix.os }}
+  build-and-pack:
+    name: Pack for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact_name: folio-windows.exe
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact_name: folio-mac-intel
+            artifact_extension: "exe" 
+          - os: macos-13 
+            artifact_extension: "dmg"
           - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact_name: folio-linux
+            artifact_extension: "AppImage"
 
     steps:
     - name: Checkout repository
@@ -30,59 +27,47 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev libgtk-3-dev libsoup2.4-dev
+        sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev libgtk-3-dev libsoup2.4-dev libfuse2
 
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: ${{ matrix.target }}
 
-    - name: Build Binary
-      run: cargo build --release --target ${{ matrix.target }}
+    - name: Install cargo-packager
+      run: cargo install cargo-packager --locked
 
-    - name: Prepare Windows Artifact
-      if: matrix.os == 'windows-latest'
-      run: cp target/${{ matrix.target }}/release/folio.exe ./folio-windows.exe
+    - name: Build and Package
+      run: cargo packager --release
 
-    - name: Prepare Unix Artifacts
-      if: matrix.os != 'windows-latest'
-      run: cp target/${{ matrix.target }}/release/folio ./${{ matrix.artifact_name }}
-
-    - name: Upload Artifact to Workflow
+    - name: Upload Installer Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.artifact_name }}
-        path: ${{ matrix.artifact_name }}
+        name: folio-${{ matrix.os }}
+        path: target/release/packager/*/**/*.${{ matrix.artifact_extension }}
 
   release:
     name: Create GitHub Release
-    needs: build
+    needs: build-and-pack
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Permissão obrigatória para criar o Release
+      contents: write
     steps:
-    - name: Download Windows Artifact
+    - name: Download All Artifacts
       uses: actions/download-artifact@v4
       with:
-        name: folio-windows.exe
+        path: artifacts
 
-    - name: Download Mac Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: folio-mac-intel
-
-    - name: Download Linux Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: folio-linux
+    - name: Move artifacts to root
+      run: |
+        find artifacts/ -type f -exec cp {} . \;
+        ls -la
 
     - name: Publish Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          folio-windows.exe
-          folio-mac-intel
-          folio-linux
-        body: "Release automática gerada pelo GitHub Actions."
+          *.dmg
+          *.AppImage
+          *.exe
+        body: "Release oficial contendo instaladores nativos DMG (Mac Intel), AppImage (Linux) e instalador Windows."
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
