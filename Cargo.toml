@@ -2,6 +2,7 @@
 name = "folio"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
 
 [dependencies]
 eframe = { version = "0.31", features = ["persistence"] }
@@ -11,17 +12,26 @@ roxmltree = "0.20"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 rfd = "0.15"
 
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
 [profile.release]
 opt-level = 3
 
 [package.metadata.packager]
-product_name = "Folio"
+product-name = "Folio"
 identifier = "com.danteernande.folio"
 version = "0.1.0"
 authors = ["Ernande"]
 description = "Leitor de livros digitais Folio"
 formats = ["dmg", "appimage", "nsis"]
-icons = ["icon.png"] 
+icons = ["icon.png", "icon.ico"]
+out-dir = "dist"
+binaries-dir = "target/release"
+binaries = [{ path = "folio", main = true }]
 
 [package.metadata.packager.macos]
-minimum_system_version = "10.12"
+minimum-system-version = "10.13"
+
+[package.metadata.packager.nsis]
+installer-icon = "icon.ico"

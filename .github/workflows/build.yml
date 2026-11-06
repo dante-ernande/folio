@@ -4,73 +4,89 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch: # permite rodar manualmente pela aba Actions (sem criar release)
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   build-and-pack:
-    name: Pack for ${{ matrix.os }}
+    name: Pack for ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            artifact_extension: "exe" 
-          - os: macos-13 
-            artifact_extension: "dmg"
-          - os: ubuntu-latest
-            artifact_extension: "AppImage"
+          - name: windows
+            os: windows-latest
+            format: nsis
+          - name: macos-intel
+            os: macos-15-intel # macos-13 foi desativado pelo GitHub
+            format: dmg
+          - name: linux
+            os: ubuntu-24.04
+            format: appimage
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install Linux Dependencies
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev libgtk-3-dev libsoup2.4-dev libfuse2
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libxkbcommon-dev libgtk-3-dev libfuse2t64 file
 
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Install cargo-packager
-      run: cargo install cargo-packager --locked
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
 
-    - name: Build Binary
-      run: cargo build --release
+      - name: Install cargo-packager
+        run: cargo install cargo-packager --locked
 
-    - name: Build and Package
-      run: cargo packager --release
+      - name: Build binary
+        run: cargo build --release
 
-    - name: Upload Installer Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: folio-${{ matrix.os }}
-        path: target/release/packager/*/**/*.${{ matrix.artifact_extension }}
+      - name: Package
+        env:
+          # linuxdeploy/appimagetool rodam sem precisar de FUSE no runner
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: cargo packager --release --formats ${{ matrix.format }}
+
+      - name: List packages
+        shell: bash
+        run: ls -la dist
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: folio-${{ matrix.name }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+          if-no-files-found: error
 
   release:
     name: Create GitHub Release
     needs: build-and-pack
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-    - name: Download All Artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
 
-    - name: Move artifacts to root
-      run: |
-        find artifacts/ -type f -exec cp {} . \;
-        ls -la
-
-    - name: Publish Release
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          *.dmg
-          *.AppImage
-          *.exe
-        body: "Release oficial contendo instaladores nativos DMG (Mac Intel), AppImage (Linux) e instalador Windows."
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          body: "Release oficial contendo instaladores nativos DMG (Mac Intel), AppImage (Linux) e instalador Windows."

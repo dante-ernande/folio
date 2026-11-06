@@ -10,6 +10,15 @@ mod style;
 
 use eframe::egui;
 
+/// Window/taskbar icon, decoded from the PNG baked into the binary.
+fn window_icon() -> egui::IconData {
+    let img = image::load_from_memory(include_bytes!("../icon.png"))
+        .expect("icon.png is a valid image")
+        .into_rgba8();
+    let (width, height) = img.dimensions();
+    egui::IconData { rgba: img.into_raw(), width, height }
+}
+
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let mut screenshot: Option<String> = None;
@@ -30,7 +39,8 @@ fn main() -> eframe::Result<()> {
             .with_title("Folio — e-book reader")
             .with_inner_size([1200.0, 800.0])
             .with_min_inner_size([640.0, 480.0])
-            .with_drag_and_drop(true),
+            .with_drag_and_drop(true)
+            .with_icon(window_icon()),
         persist_window: screenshot.is_none(),
         ..Default::default()
     };
